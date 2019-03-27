@@ -1,4 +1,7 @@
 # sesam-cifs-cvs-reader
+
+[![Build Status](https://travis-ci.org/sesam-community/sesam-cifs-cvs-reader.svg?branch=master)](https://travis-ci.org/sesam-community/sesam-cifs-cvs-reader)
+
 Simple sesam source that fetch CVS file from CIFS share
 
 ## System set up
