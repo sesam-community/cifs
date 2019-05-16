@@ -54,3 +54,33 @@ Simple sesam source that fetch CVS file from CIFS share
 }
 
 ```
+
+## Pipe set up with headers as URL parameters
+```json
+{
+  "_id": "<id>",
+  "type": "pipe",
+  "source": {
+    "type": "json",
+    "system": "<system id>",
+    "url": "/some-file.csv?headers=header1,header2,header3"
+  },
+  "transform": {
+    "type": "dtl",
+    "rules": {
+      "default": [
+        ["add", "_id",
+          ["string",
+            ["concat", "_S.header1", "-", "_S.header2", "-", "_S.header3"]
+          ]
+        ],
+        ["copy", "*"]
+      ]
+    }
+  },
+  "pump": {
+    "cron_expression": "0 7 * * ?"
+  }
+}
+
+```
