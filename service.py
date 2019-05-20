@@ -22,15 +22,20 @@ fieldnames = os.environ.get("fieldnames",
 def process_request(file_name):
     logging.info("Processing request..")
 
-    # get headers from URL parameters
+    # get URL params
+    delimiter = request.args.get('delimiter')
     headers = request.args.get('headers')
-    logging.debug(headers)
+
+    # defaulting to comma separated files if no delimiters are supplied in URL
+    if delimiter is None:
+        delimiter = ','
 
     if headers is not None:
-        fieldnames = headers.split(',')
+        fieldnames = headers.split(delimiter)
 
     logging.info("csv file: %s" % file_name)
     logging.info("csv headers: %s" % ','.join(fieldnames))
+    logging.info("csv delimiter: '%s'" % delimiter)
 
     if file_name == "use_current_date_filename":
         import datetime
@@ -52,7 +57,7 @@ def process_request(file_name):
             conn.retrieveFile(os.environ.get("share"), file_name, fp)
             logging.info("Completed file downloading...", )
         with open('local_file', 'r', encoding='utf-8', errors='ignore') as fp:
-            return Response(json.dumps(list(csv.DictReader(fp, fieldnames=fieldnames))),
+            return Response(json.dumps(list(csv.DictReader(fp, fieldnames=fieldnames, delimiter=delimiter))),
                             content_type="application/json")
     except Exception as e:
         logging.info(e)
