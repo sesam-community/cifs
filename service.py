@@ -1,70 +1,60 @@
-import csv
+import io
 import os
+import sys
 
-import json
 import logging
 import socket
 
-from flask import Flask, Response, request, abort
+from flask import Flask, abort, send_file
 from waitress import serve
 from smb.SMBConnection import SMBConnection
-
+from sesamutils import VariablesConfig
 APP = Flask(__name__)
 
 logging.basicConfig(level='INFO')
 
-fieldnames = os.environ.get("fieldnames",
-                            "maalepunkt,netteigarmaalarid,installasjonsid,namn,husnr,adresse,poststad,postnr,telefonnr,telefonnrjob,mobilnummer1,epost").split(
-    ",")
+required_env_vars = ["username", "password", "hostname", "host", "share"]
+config = VariablesConfig(required_env_vars)
+if not config.validate():
+    sys.exit(1)
 
 
-@APP.route("/<file_name>", methods=['GET'])
-def process_request(file_name):
-    logging.info("Processing request..")
+def create_connection():
+    return SMBConnection(config.username, config.password, socket.gethostname(),
+                          config.hostname, is_direct_tcp=True, use_ntlm_v2=True)
 
-    # get URL params
-    delimiter = request.args.get('delimiter')
-    headers = request.args.get('headers')
 
-    # defaulting to comma separated files if no delimiters are supplied in URL
-    if delimiter is None:
-        delimiter = ','
+@APP.route("/<path:path>", methods=['GET'])
+def process_request(path):
+    logging.info(f"Processing request for path '{path}'.")
 
-    if headers is not None:
-        fieldnames = headers.split(delimiter)
+    conn = create_connection()
+    if not conn.connect(config.host, 445):
+        logging.error("Failed to authenticate with the provided credentials")
+        conn.close()
+        return "Invalid credentials provided for fileshare", 500
 
-    logging.info("csv file: %s" % file_name)
-    logging.info("csv headers: %s" % ','.join(fieldnames))
-    logging.info("csv delimiter: '%s'" % delimiter)
+    logging.info("Successfully connected to SMB host.")
 
-    if file_name == "use_current_date_filename":
-        import datetime
-        today = datetime.date.today()
-        file_name = "customer_{}.lst".format(today.strftime("%d-%m-%y"))
-
-    conn = SMBConnection(os.environ.get("username"), os.environ.get("password"), socket.gethostname(),
-                         os.environ.get("hostname"), is_direct_tcp=True, use_ntlm_v2=True)
-    conn.connect(os.environ.get("host"), 445)
-    logging.info("Connected to SMB host ...")
-
-    logging.info("List shares...")
+    logging.info("Listing available shares:")
     share_list = conn.listShares()
     for share in share_list:
-        logging.info('Shared device: %s (type:0x%02x comments:%s)' % (share.name, share.type, share.comments))
+        logging.info(f"{share.name}  {share.type}    {share.comments}")
+
+    path_parts = path.split("/")
+    file_name = path_parts[len(path_parts)-1]
 
     try:
         with open('local_file', 'wb') as fp:
-            conn.retrieveFile(os.environ.get("share"), file_name, fp)
+            conn.retrieveFile(config.share, path, fp)
             logging.info("Completed file downloading...", )
-        with open('local_file', 'r', encoding='utf-8', errors='ignore') as fp:
-            return Response(json.dumps(list(csv.DictReader(fp, fieldnames=fieldnames, delimiter=delimiter))),
-                            content_type="application/json")
+        return send_file('local_file', attachment_filename=file_name)
     except Exception as e:
-        logging.info(e)
-        logging.info("List files founded on share")
+        logging.error(f"Failed to get file from fileshare. Error: {e}")
+        logging.debug("Files found on share:")
         file_list = conn.listPath(os.environ.get("share"), "/")
         for f in file_list:
-            logging.info('file: %s (FileSize:%d bytes, isDirectory:%s)' % (f.filename, f.file_size, f.isDirectory))
+            logging.debug('file: %s (FileSize:%d bytes, isDirectory:%s)' % (f.filename, f.file_size, f.isDirectory))
     finally:
         conn.close()
         os.remove("local_file")
@@ -73,4 +63,14 @@ def process_request(file_name):
 
 if __name__ == "__main__":
     logging.info("Starting service...")
+
+    # Test connection at startup
+    conn = create_connection()
+    if not conn.connect(config.host, 445):
+        logging.error("Failed to authenticate with the provided credentials")
+    conn.close()
+
     serve(APP, host='0.0.0.0', port=8080)
+
+
+# TODO: cherrypy https://github.com/sesam-io/python-datasink-template/blob/master/service/datasink-service.py
