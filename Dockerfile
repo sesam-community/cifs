@@ -6,7 +6,7 @@ WORKDIR /opt/service
 
 RUN pip install -r requirements.txt
 
-EXPOSE 8080:8080
+EXPOSE 5000
 
 ENTRYPOINT ["python3"]
 CMD ["service.py"]

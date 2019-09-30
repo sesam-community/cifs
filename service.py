@@ -5,12 +5,12 @@ import sys
 import socket
 
 from flask import Flask, abort, send_file
-from waitress import serve
 from smb.SMBConnection import SMBConnection
 from sesamutils import VariablesConfig, sesam_logger
+from sesamutils.flask import serve
 APP = Flask(__name__)
 
-logger = sesam_logger("cifs-reader")
+logger = sesam_logger("cifs-reader", app=APP)
 
 required_env_vars = ["username", "password", "hostname", "host", "share"]
 config = VariablesConfig(required_env_vars)
@@ -20,7 +20,7 @@ if not config.validate():
 
 def create_connection():
     return SMBConnection(config.username, config.password, socket.gethostname(),
-                          config.hostname, is_direct_tcp=True, use_ntlm_v2=True)
+                         config.hostname, is_direct_tcp=True, use_ntlm_v2=True)
 
 
 @APP.route("/<path:path>", methods=['GET'])
@@ -69,7 +69,4 @@ if __name__ == "__main__":
         logger.error("Failed to authenticate with the provided credentials")
     conn.close()
 
-    serve(APP, host='0.0.0.0', port=8080)
-
-
-# TODO: cherrypy https://github.com/sesam-io/python-datasink-template/blob/master/service/datasink-service.py
+    serve(APP)
