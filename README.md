@@ -1,14 +1,14 @@
-# sesam-cifs-cvs-reader
+# cifs
 
-[![Build Status](https://travis-ci.org/sesam-community/sesam-cifs-cvs-reader.svg?branch=master)](https://travis-ci.org/sesam-community/sesam-cifs-cvs-reader)
+[![Build Status](https://travis-ci.org/sesam-community/cifs.svg?branch=master)](https://travis-ci.org/sesam-community/cifs)
 
-Simple sesam source that fetch CVS file from CIFS share
+Sesam microservice to read files from cifs file share.
 
 ## System set up
 
 ```json
 {
-  "_id": "<id>",
+  "_id": "<my-system-id>",
   "type": "system:microservice",
   "docker": {
     "environment": {
@@ -18,69 +18,41 @@ Simple sesam source that fetch CVS file from CIFS share
       "share": "<share name>",
       "username": "<username>"
     },
-    "image": "ohuenno/python-cifs-test",
-    "port": 8080
-  },
-  "verify_ssl": true
+    "image": "sesamcommunity/cifs",
+    "port": 5000
+  }
 }
 
 ```
-## Pipe set up
+## Pipe example
+Example when reading a csv file:
 ```json
 {
-  "_id": "<id>",
+  "_id": "<my-pipe-id>",
   "type": "pipe",
   "source": {
-    "type": "json",
-    "system": "<system id>",
-    "url": "/use_current_date_filename"
+    "type": "csv",
+    "system": "<my-system-id>",
+    "auto_dialect": true,
+    "delimiter": ";",
+    "dialect": "excel",
+    "encoding": "utf-8",
+    "has_header": true,
+    "preserve_empty_strings": false,
+    "primary_key": "DOC_NO",
+    "url": "/path/to/file.csv"
   },
   "transform": {
     "type": "dtl",
     "rules": {
       "default": [
-        ["add", "_id",
-          ["string",
-            ["concat", "_S.maalepunkt", "-", "_S.netteigarmaalarid", "-", "_S.installasjonsid"]
-          ]
-        ],
-        ["copy", "*"]
+        ["copy", "*"],
+        ["add", "rdf:type",
+          ["ni", "cool:Document"]
+        ]
       ]
     }
   },
-  "pump": {
-    "cron_expression": "0 7 * * ?"
-  }
+  "add_namespaces": true
 }
-
-```
-
-## Pipe set up with headers as URL parameters
-```json
-{
-  "_id": "<id>",
-  "type": "pipe",
-  "source": {
-    "type": "json",
-    "system": "<system id>",
-    "url": "/some-file.csv?headers=header1,header2,header3"
-  },
-  "transform": {
-    "type": "dtl",
-    "rules": {
-      "default": [
-        ["add", "_id",
-          ["string",
-            ["concat", "_S.header1", "-", "_S.header2", "-", "_S.header3"]
-          ]
-        ],
-        ["copy", "*"]
-      ]
-    }
-  },
-  "pump": {
-    "cron_expression": "0 7 * * ?"
-  }
-}
-
 ```
